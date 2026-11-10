@@ -2,7 +2,7 @@
 
 UCHAR CH9120_Mode = TCP_CLIENT; //Optional:TCP_SERVER、TCP_CLIENT、UDP_SERVER、UDP_CLIENT
 UCHAR CH9120_TARGET_IP[4] = {10, 27, 1, 88};  // TARGET_IP
-UWORD CH9120_TARGET_PORT = 8000;                  // TARGET PORT
+UWORD CH9120_TARGET_PORT = 8010;                  // TARGET PORT (AusbildungsManager hardware gateway)
 UBOOL CH9120_DHCP = 1;
 UCHAR CH9120_LOCAL_IP[4] = {192, 168, 100, 205};   // LOCAL IP
 UCHAR CH9120_GATEWAY[4] = {192, 168, 100, 1};      // GATEWAY
@@ -291,7 +291,7 @@ void CH9120_init(void)
       CH9120_SetGateway(CH9120_GATEWAY);        // GATEWAY
     }    
     CH9120_SetLocalPort(CH9120_PORT1);        //Local port
-    //CH9120_SetTargetIP(CH9120_TARGET_IP);     //TARGET IP
+    CH9120_SetTargetIP(CH9120_TARGET_IP);     //TARGET IP
     CH9120_SetTargetPort(CH9120_TARGET_PORT); //Target port
     CH9120_SetBaudRate(CH9120_BAUD_RATE);     //Port 1 baud rate
     CH9120_End(); 

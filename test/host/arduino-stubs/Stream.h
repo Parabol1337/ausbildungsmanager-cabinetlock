@@ -20,6 +20,7 @@ private:
 class Print {
 public:
     virtual ~Print() {}
+    virtual void flush() {}   // as in the real Print: wait until everything is sent
     virtual size_t write(uint8_t) = 0;
     virtual size_t write(const uint8_t* data, size_t length) {
         size_t n = 0;

@@ -29,7 +29,7 @@ prüft, ob sich still etwas geändert hat.
 |---|---|---|
 | `src/AMLink/` | Verbindung zum AusbildungsManager (Protokoll v2) | eigene Bibliothek, Stand steht in `src/AMLink/VERSION` (Version + Commit). **Nicht von Hand ändern**, sondern im Repo `ausbildungsmanager-link` mit `tools/vendor.sh` aktualisieren |
 | `CH9120.cpp`, `CH9120.h`, `CH9120.cfg` | Einrichtung der Netzwerkbrücke (Waveshare-Beispielcode, angepasst) | Waveshare; `CH9120.cpp` enthält **Ziel-IP und -Port** und ist daher nicht in der Prüfsummenliste |
-| `*.ino` | eigener Code | dieses Repository |
+| `*.ino`, `Modbus.h`, `Modbus.cpp` | eigener Code | dieses Repository |
 
 Beim Hinzufügen einer Bibliothek: Datei(en) in den Ordner kopieren, mit Anführungszeichen einbinden, hier eintragen
 (Quelle, Version, Lizenz) und `DEPENDENCIES.sha256` neu erzeugen:

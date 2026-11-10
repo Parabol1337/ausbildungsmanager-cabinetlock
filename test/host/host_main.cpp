@@ -2,7 +2,8 @@
 //  - the CH9120 network bridge: a TCP connection to the server, delivered to the sketch as serial data on Serial2,
 //    with the "not connected" pin (D17) following the connection (and reconnecting like the chip does)
 //  - the RS485 bus with two Modbus relay modules (addresses 1 and 2): answers input requests with the doors that are
-//    closed or open, takes relay commands (and answers them like the real module does)
+//    closed or open, takes relay commands (and answers them like the real module does), and, for address 0, a single
+//    module whose address can be set and read
 //
 //   host_test <server-host> <server-port>
 // stdin: open <channel> | closed <channel> | silent | talk | button | release | quit
@@ -119,17 +120,14 @@ static void bridgeStep(uint32_t now) {
 
 
 // ---- RS485 bus with the relay modules ---------------------------------------------------------------------------------
-typedef uint8_t byte;
-#define lowByte(w) ((uint8_t)((w) & 0xff))
-#define highByte(w) ((uint8_t)((w) >> 8))
 #define Modbus_Serial g_modbus
-#define Modbus_DE_NAME "D2"
 
 #include <deque>
 #include <vector>
 
 namespace {
-uint8_t g_inputs[3] = {0, 0xff, 0xff};   // by module address: bit = 1 means "door closed"
+uint8_t g_inputs[256];          // by module address: bit n-1 = 1 means input n is "door closed"
+uint8_t g_moduleAddress = 255;  // address of a module that is programmed (the only one on the bus)
 bool g_silent = false;
 
 uint16_t crcOf(const uint8_t* d, size_t n) {
@@ -150,7 +148,7 @@ struct ModbusBus : HardwareSerial {
     int available() override { return int(in.size()); }
     int read() override { if (in.empty()) return -1; int b = in.front(); in.pop_front(); return b; }
     int peek() override { return in.empty() ? -1 : in.front(); }
-    void flush() { process(); }
+    void flush() override { process(); }
     void reply(std::vector<uint8_t> frame) {
         uint16_t crc = crcOf(frame.data(), frame.size());
         frame.push_back(crc & 0xff);
@@ -160,46 +158,50 @@ struct ModbusBus : HardwareSerial {
     void process();
 };
 ModbusBus g_modbus;
-HardwareSerial& g_unusedSerial1 = g_modbus;
-
-// forward declarations (the Arduino IDE generates them)
-void SetModbusRelais(byte slave, byte output, byte flash);
-void RequestModbusInput(byte slave);
-bool modbusPoll(byte& slave, byte& inputs);
 
 // ---- the real sketch -----------------------------------------------------------------------------------------------
 #include "../../RP2040-ETH_Cabinet.ino"
-#include "../../Modbus.ino"
 // ---------------------------------------------------------------------------------------------------------------------
 
+// The bus: two modules (1 and 2) answer for themselves; address 0 reaches a module that is alone on the bus.
 void ModbusBus::process() {
-        if (out.size() < 8) { out.clear(); return; }
-        uint16_t crc = crcOf(out.data(), out.size() - 2);
-        if (out[out.size() - 2] != (crc & 0xff) || out.back() != (crc >> 8)) { ::printf("MODBUS-BAD\n"); fflush(stdout); out.clear(); return; }
-        uint8_t slave = out[0];
-        if (!g_silent && slave >= 1 && slave <= 2) {
-            if (out[1] == 0x02) {
-                reply({slave, 0x02, 0x01, g_inputs[slave]});
-            } else if (out[1] == 0x10) {
-                int ch = 0;
-                for (int i = 0; i < Channel; i++) if (ChModulAddr[i] == slave && ChRelaisAddr[i] == out[3]) ch = i + 1;
-                ::printf("RELAY %d %d\n", ch, out[10]);
-                fflush(stdout);
-                reply({slave, 0x10, out[2], out[3], 0x00, 0x02});
-            }
+    if (out.size() < 8) { out.clear(); return; }
+    uint16_t crc = crcOf(out.data(), out.size() - 2);
+    if (out[out.size() - 2] != (crc & 0xff) || out.back() != (crc >> 8)) { ::printf("MODBUS-BAD\n"); fflush(stdout); out.clear(); return; }
+    uint8_t slave = out[0];
+    if (g_silent) { out.clear(); return; }
+    if (slave == 0 && out[1] == 0x10) {                       // set the address of the module on the bus
+        g_moduleAddress = out[8];
+        ::printf("ADDRESS %d\n", g_moduleAddress);
+        fflush(stdout);
+        reply({0x00, 0x10, 0x00, 0x00, 0x00, 0x01});
+    } else if (slave == 0 && out[1] == 0x03) {                // read it
+        reply({0x00, 0x03, 0x02, 0x00, g_moduleAddress});
+    } else if (slave >= 1 && slave <= 2) {
+        if (out[1] == 0x02) {
+            reply({slave, 0x02, 0x01, g_inputs[slave]});
+        } else if (out[1] == 0x10) {
+            int reg = out[2] * 256 + out[3];
+            int relay = (reg - 3) / 5 + 1;
+            int ch = 0;
+            for (unsigned i = 0; i < Channel; i++) if (Cabinets[i].module == slave && Cabinets[i].relay == relay) ch = int(i) + 1;
+            ::printf("RELAY %d %d\n", ch, out[10]);
+            fflush(stdout);
+            reply({slave, 0x10, out[2], out[3], 0x00, 0x02});
         }
-        out.clear();
     }
+    out.clear();
+}
 
 static void command(char* line) {
     char* arg = strchr(line, ' ');
     if (arg) *arg++ = 0;
     if ((!strcmp(line, "open") || !strcmp(line, "closed")) && arg) {
         int ch = atoi(arg) - 1;
-        if (ch >= 0 && ch < Channel) {
-            uint8_t bit = uint8_t(1u << ChInputBit[ch]);
-            if (!strcmp(line, "open")) g_inputs[ChModulAddr[ch]] &= uint8_t(~bit);
-            else g_inputs[ChModulAddr[ch]] |= bit;
+        if (ch >= 0 && ch < (int)Channel && Cabinets[ch].contact) {
+            uint8_t bit = uint8_t(1u << (Cabinets[ch].contact - 1));
+            if (!strcmp(line, "open")) g_inputs[Cabinets[ch].module] &= uint8_t(~bit);
+            else g_inputs[Cabinets[ch].module] |= bit;
         }
     } else if (!strcmp(line, "silent")) {
         g_silent = true;
@@ -225,6 +227,7 @@ int main(int argc, char** argv) {
     g_host = argv[1];
     g_port = atoi(argv[2]);
     g_pinLevel[D17] = HIGH;
+    memset(g_inputs, 0xff, sizeof(g_inputs));   // all doors closed
 
     g_millis = nowMs();
     setup();

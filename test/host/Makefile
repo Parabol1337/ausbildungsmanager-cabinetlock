@@ -7,12 +7,14 @@ FLAGS    := -std=gnu++11 -Wall -Wextra -g -fsanitize=address,undefined -fno-omit
             -DARDUINO=10819 -DAMLINK_ARDUINO_STUBS=1 -DARDUINO_ARCH_RP2040 -DAMLINK_CUSTOM_ENV \
             -I. -Istubs -Iarduino-stubs -I$(AMLINK) -I../..
 BUILD    ?= build
+# Variants of the sketch, e.g.  make DEFS=-DProgram_Module_Address=5 BUILD=build-program
+DEFS     ?=
 
 all: $(BUILD)/host_test
 
-$(BUILD)/host_test: host_main.cpp ../../Modbus.ino ../../RP2040-ETH_Cabinet.ino $(wildcard stubs/*.h) env_host.cpp $(CORE) $(wildcard $(AMLINK)/*.h $(AMLINK)/amlink/*.h $(AMLINK)/amlink/arduino/*.h arduino-stubs/*.h)
+$(BUILD)/host_test: host_main.cpp ../../Modbus.cpp ../../Modbus.h ../../RP2040-ETH_Cabinet.ino $(wildcard stubs/*.h) env_host.cpp $(CORE) $(wildcard $(AMLINK)/*.h $(AMLINK)/amlink/*.h $(AMLINK)/amlink/arduino/*.h arduino-stubs/*.h)
 	@mkdir -p $(BUILD)
-	$(CXX) $(FLAGS) $(CORE) env_host.cpp host_main.cpp -o $@
+	$(CXX) $(FLAGS) $(DEFS) $(CORE) ../../Modbus.cpp env_host.cpp host_main.cpp -o $@
 
 clean:
 	rm -rf build build-*

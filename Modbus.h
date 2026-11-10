@@ -10,14 +10,19 @@
 #include <Stream.h>
 #include <stdint.h>
 
-// Register of relay n (1..8) for "switch on for a time": Modbus_Relay_Register_Base + Modbus_Relay_Register_Step * (n - 1).
-// These are the values of the Waveshare module (0x0003, 0x0008, 0x000D, ...). Another module type: set them when building.
-#ifndef Modbus_Relay_Register_Base
-#define Modbus_Relay_Register_Base 3
-#endif
-#ifndef Modbus_Relay_Register_Step
-#define Modbus_Relay_Register_Step 5
-#endif
+// What differs between module types: where the registers of the relays are and how the inputs are numbered.
+// Describe another module here (or in the sketch) and give it to the cabinets that use it.
+struct ModbusBoardType {
+  const char* name;
+  uint16_t relayRegisterBase;   // register of relay 1 for "switch on for a time" ...
+  uint16_t relayRegisterStep;   // ... relay n has base + step * (n - 1)
+  uint16_t pulseUnitMs;         // the time of that command is counted in steps of this many ms
+  bool inputsMsbFirst;          // false: input 1 is bit 0 of the answer, true: input 1 is bit 7
+};
+
+// Waveshare "Modbus RTU Relay" (8 relays, 8 optocoupler inputs): registers 0x0003, 0x0008, 0x000D, ..., steps of 0.1 s.
+const ModbusBoardType ModbusWaveshare8 = {"Waveshare Modbus RTU Relay", 3, 5, 100, false};
+
 // How long a missing answer is waited for
 #ifndef Modbus_Reply_Timeout
 #define Modbus_Reply_Timeout 200
@@ -28,7 +33,7 @@ public:
   struct Reply {
     enum Kind { None, Inputs, Address } kind;
     uint8_t module;   // address the answer came from
-    uint8_t value;    // Inputs: bit 0 = input 1 ... bit 7 = input 8.  Address: the address the module reports
+    uint8_t value;    // Inputs: the 8 input bits as the module sent them (see inputOn()).  Address: the address the module reports
   };
 
   // port: the serial port of the RS485 transceiver (already begin()ed). dePin: direction pin (HIGH while sending), or
@@ -37,9 +42,9 @@ public:
 
   void begin();
 
-  // Relay 1..8 of a module on for `tenths` x 100 ms (1..255); the module switches it off by itself.
-  void pulse(uint8_t module, uint8_t relay, uint8_t tenths);
-  // Ask a module for its inputs.
+  // Relay 1..8 of a module on for `steps` (1..255) x the time step of its type; the module switches it off by itself.
+  void pulse(const ModbusBoardType& type, uint8_t module, uint8_t relay, uint8_t steps);
+  // Ask a module for its 8 inputs.
   void requestInputs(uint8_t module);
   // Give ONE module a new address. Goes to address 0 (everybody listens): only one module may be on the bus!
   void setAddress(uint8_t newAddress);
@@ -49,6 +54,11 @@ public:
   // Takes in received bytes. True when a complete, correct answer to an input or address request is there.
   // Answers to relay commands are consumed and dropped, damaged bytes are skipped.
   bool poll(Reply& reply);
+
+  // Is input 1..8 on in the answer `bits` of a module of this type?
+  static bool inputOn(const ModbusBoardType& type, uint8_t bits, uint8_t input) {
+    return (bits >> (type.inputsMsbFirst ? 8 - input : input - 1)) & 0x01;
+  }
 
   static uint16_t crc(const uint8_t* data, int length);
 

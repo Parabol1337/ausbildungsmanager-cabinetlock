@@ -19,24 +19,28 @@
 // ---------------------------------------------------------------------------------------------------------------------
 // 1. THE CABINETS - one line each, in the order of the cabinet numbers (cabinet 1 first). Add or remove lines freely.
 //
+//      board   = type of the relay module (where its relay registers are, how its inputs are numbered):
+//                ModbusWaveshare8 = Waveshare Modbus RTU Relay. Another type: describe it in Modbus.h (struct
+//                ModbusBoardType) and write its name here. All cabinets on one module need the same type.
 //      module  = Modbus address of the relay module this cabinet is wired to (1..255, see README)
 //      relay   = number of the relay on that module that opens the lock (1..8)
 //      contact = number of the input on that module that reports "door closed" (1..8), or 0 if there is no contact
 // ---------------------------------------------------------------------------------------------------------------------
 struct Cabinet {
+  const ModbusBoardType* board;
   uint8_t module;
   uint8_t relay;
   uint8_t contact;
 };
 
 const Cabinet Cabinets[] = {
-  // module  relay  contact
-  {   2,      1,     1 },   // cabinet 1
-  {   2,      2,     2 },   // cabinet 2
-  {   2,      3,     3 },   // cabinet 3
-  {   1,      2,     1 },   // cabinet 4
-  {   1,      1,     2 },   // cabinet 5
-  {   2,      4,     4 },   // cabinet 6
+  // board              module  relay  contact
+  { &ModbusWaveshare8,   2,      1,     1 },   // cabinet 1
+  { &ModbusWaveshare8,   2,      2,     2 },   // cabinet 2
+  { &ModbusWaveshare8,   2,      3,     3 },   // cabinet 3
+  { &ModbusWaveshare8,   1,      2,     1 },   // cabinet 4
+  { &ModbusWaveshare8,   1,      1,     2 },   // cabinet 5
+  { &ModbusWaveshare8,   2,      4,     4 },   // cabinet 6
 };
 #define Channel (sizeof(Cabinets) / sizeof(Cabinets[0]))
 
@@ -68,7 +72,7 @@ const Cabinet Cabinets[] = {
 // ---------------------------------------------------------------------------------------------------------------------
 #define Input_Interval 250        // ms between two input requests (modules are asked in turn)
 #define Default_Pulse_Ms 1000     // relay time if the server does not ask for a specific duration
-#define Max_Pulse_Ms 10000        // longest relay time (the module counts in steps of 100 ms, at most 25.5 s)
+#define Max_Pulse_Ms 10000        // longest relay time (a module counts at most 255 steps)
 
 // Setting the address of a relay module (see README): connect ONLY that module, build with the new address in
 // -DProgram_Module_Address=<1..255>. The board then does nothing else: it sends the address and shows what the module
@@ -107,9 +111,11 @@ int onLock(void* context, amlink::Call& call) {
   long ms = call.intArg("pulse_ms", Default_Pulse_Ms);
   if (ms < 100) ms = 100;
   if (ms > Max_Pulse_Ms) ms = Max_Pulse_Ms;
-  uint8_t tenths = uint8_t((ms + 50) / 100);
-  modbus.pulse(Cabinets[ch].module, Cabinets[ch].relay, tenths);
-  lockUntil[ch] = millis() + uint32_t(tenths) * 100;
+  const ModbusBoardType& type = *Cabinets[ch].board;
+  long steps = (ms + type.pulseUnitMs / 2) / type.pulseUnitMs;
+  if (steps > 255) steps = 255;
+  modbus.pulse(type, Cabinets[ch].module, Cabinets[ch].relay, uint8_t(steps));
+  lockUntil[ch] = millis() + uint32_t(steps) * type.pulseUnitMs;
   lockOpen[ch] = true;
   amLink.setState(lockKey[ch], "unlocked");
   return amlink::AM_OK;
@@ -216,7 +222,7 @@ void loop() {
   if (modbus.poll(reply) && reply.kind == ModbusRelays::Reply::Inputs) {
     for (unsigned i = 0; i < Channel; i++) {
       if (Cabinets[i].module != reply.module || !Cabinets[i].contact) continue;
-      int open = ((reply.value >> (Cabinets[i].contact - 1)) & 0x01) ? 0 : 1;
+      int open = ModbusRelays::inputOn(*Cabinets[i].board, reply.value, Cabinets[i].contact) ? 0 : 1;
       if (open != doorReported[i]) {
         doorReported[i] = open;
         amLink.setState(doorKey[i], open ? "on" : "off");

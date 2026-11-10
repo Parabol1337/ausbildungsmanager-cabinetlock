@@ -24,15 +24,16 @@ Oben in `RP2040-ETH_Cabinet.ino` steht **eine Tabelle, eine Zeile pro Schrank** 
 
 ```cpp
 const Cabinet Cabinets[] = {
-  // module  relay  contact
-  {   2,      1,     1 },   // cabinet 1
-  {   2,      2,     2 },   // cabinet 2
+  // board              module  relay  contact
+  { &ModbusWaveshare8,   2,      1,     1 },   // cabinet 1
+  { &ModbusWaveshare8,   2,      2,     2 },   // cabinet 2
   ...
 };
 ```
 
 | Spalte | Bedeutung |
 |---|---|
+| `board` | Typ des Relaismoduls: wo seine Relais-Register liegen und wie die Eingänge nummeriert sind (`ModbusWaveshare8`, siehe unten). Alle Schränke an demselben Modul haben denselben Typ |
 | `module` | Modbus-Adresse des Relaismoduls, an dem der Schrank hängt (1 bis 255) |
 | `relay` | Nummer des Relais auf diesem Modul, das das Schloss öffnet (1 bis 8) |
 | `contact` | Nummer des Eingangs auf diesem Modul, der „Tür zu“ meldet (1 bis 8), oder `0` wenn der Schrank keinen Kontakt hat |
@@ -60,8 +61,19 @@ Die Baudrate der Module ist ab Werk 9600; sie lässt sich mit `Modbus_Baud` anpa
   `TCP_Disconnected`, …) und lassen sich auch beim Bauen mit `-D…` überschreiben. `Modbus_DE = -1` für RS485-Wandler,
   die die Richtung selbst umschalten.
 - **Andere Relaismodule:** Die Modbus-Teile stehen getrennt in `Modbus.h` / `Modbus.cpp` und wissen nichts vom Board.
-  Die Registeradresse eines Relais ist `Modbus_Relay_Register_Base + Modbus_Relay_Register_Step * (Relais - 1)`
-  (Waveshare: 3 und 5); bei einem anderen Modul beim Bauen setzen.
+  Was sich von Modultyp zu Modultyp unterscheidet, steht in einem Typ (`struct ModbusBoardType` in `Modbus.h`):
+  Register des ersten Relais, Abstand zum nächsten, Zeitschritt des Befehls in ms und ob Eingang 1 Bit 0 oder Bit 7 ist.
+  Für das Waveshare-Modul gibt es `ModbusWaveshare8` (Register 3, 8, 13, …, Schritt 100 ms, Eingang 1 = Bit 0). Ein
+  anderes Modul wird als weiterer Typ beschrieben, und der Schrank bekommt ihn in der Spalte `board`:
+
+  ```cpp
+  const ModbusBoardType MeinModul = {"Mein Modul", 0x10, 2, 100, false};
+  ...
+  { &MeinModul,   3,      1,     1 },   // cabinet 7
+  ```
+
+  Gleich bleiben müssen die Befehle selbst (Relais auf Zeit: Funktion 0x10, Eingänge lesen: Funktion 0x02 mit 8 Eingängen).
+  Module mit anderen Befehlen brauchen eine Erweiterung in `Modbus.cpp`.
 - **Anderes Netzwerk (WLAN, W5500 …):** Das CH9120 gehört zur Netzwerkseite. Mit anderem Netzwerk wird in der `.ino`
   statt `SerialBridgeTransport` der passende Transport von AMLink benutzt (`ClientTransport` für WiFi/Ethernet-Clients);
   Entitäten und Modbus bleiben gleich. Das ist nicht getestet.

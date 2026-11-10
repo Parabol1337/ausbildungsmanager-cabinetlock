@@ -34,9 +34,9 @@ void ModbusRelays::send(const uint8_t* message, int length) {
   if (dePin_ >= 0) digitalWrite(dePin_, LOW);
 }
 
-void ModbusRelays::pulse(uint8_t module, uint8_t relay, uint8_t tenths) {
-  uint16_t reg = uint16_t(Modbus_Relay_Register_Base + Modbus_Relay_Register_Step * (relay - 1));
-  const uint8_t message[] = {module, 0x10, uint8_t(reg >> 8), uint8_t(reg & 0xFF), 0x00, 0x02, 0x04, 0x00, 0x04, 0x00, tenths};
+void ModbusRelays::pulse(const ModbusBoardType& type, uint8_t module, uint8_t relay, uint8_t steps) {
+  uint16_t reg = uint16_t(type.relayRegisterBase + type.relayRegisterStep * (relay - 1));
+  const uint8_t message[] = {module, 0x10, uint8_t(reg >> 8), uint8_t(reg & 0xFF), 0x00, 0x02, 0x04, 0x00, 0x04, 0x00, steps};
   send(message, sizeof(message));
 }
 

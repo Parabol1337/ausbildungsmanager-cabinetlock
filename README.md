@@ -25,15 +25,15 @@ Oben in `RP2040-ETH_Cabinet.ino` steht **eine Tabelle, eine Zeile pro Schrank** 
 ```cpp
 const Cabinet Cabinets[] = {
   // board              module  relay  contact
-  { &ModbusWaveshare8,   2,      1,     1 },   // cabinet 1
-  { &ModbusWaveshare8,   2,      2,     2 },   // cabinet 2
+  { &ModbusWaveshare,   2,      1,     1 },   // cabinet 1
+  { &ModbusWaveshare,   2,      2,     2 },   // cabinet 2
   ...
 };
 ```
 
 | Spalte | Bedeutung |
 |---|---|
-| `board` | Typ des Relaismoduls: wo seine Relais-Register liegen und wie die Eingänge nummeriert sind (`ModbusWaveshare8`, siehe unten). Alle Schränke an demselben Modul haben denselben Typ |
+| `board` | Typ des Relaismoduls: wo seine Relais-Register liegen und wie die Eingänge nummeriert sind (`ModbusWaveshare`, siehe unten). Alle Schränke an demselben Modul haben denselben Typ |
 | `module` | Modbus-Adresse des Relaismoduls, an dem der Schrank hängt (1 bis 255) |
 | `relay` | Nummer des Relais auf diesem Modul, das das Schloss öffnet (1 bis 8) |
 | `contact` | Nummer des Eingangs auf diesem Modul, der „Tür zu“ meldet (1 bis 8), oder `0` wenn der Schrank keinen Kontakt hat |
@@ -63,7 +63,7 @@ Die Baudrate der Module ist ab Werk 9600; sie lässt sich mit `Modbus_Baud` anpa
 - **Andere Relaismodule:** Die Modbus-Teile stehen getrennt in `Modbus.h` / `Modbus.cpp` und wissen nichts vom Board.
   Was sich von Modultyp zu Modultyp unterscheidet, steht in einem Typ (`struct ModbusBoardType` in `Modbus.h`):
   Register des ersten Relais, Abstand zum nächsten, Zeitschritt des Befehls in ms und ob Eingang 1 Bit 0 oder Bit 7 ist.
-  Für das Waveshare-Modul gibt es `ModbusWaveshare8` (Register 3, 8, 13, …, Schritt 100 ms, Eingang 1 = Bit 0). Ein
+  Für das Waveshare-Modul gibt es `ModbusWaveshare` (Register 3, 8, 13, …, Schritt 100 ms, Eingang 1 = Bit 0). Ein
   anderes Modul wird als weiterer Typ beschrieben, und der Schrank bekommt ihn in der Spalte `board`:
 
   ```cpp

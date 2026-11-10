@@ -20,7 +20,7 @@
 // 1. THE CABINETS - one line each, in the order of the cabinet numbers (cabinet 1 first). Add or remove lines freely.
 //
 //      board   = type of the relay module (where its relay registers are, how its inputs are numbered):
-//                ModbusWaveshare8 = Waveshare Modbus RTU Relay. Another type: describe it in Modbus.h (struct
+//                ModbusWaveshare = Waveshare Modbus RTU Relay. Another type: describe it in Modbus.h (struct
 //                ModbusBoardType) and write its name here. All cabinets on one module need the same type.
 //      module  = Modbus address of the relay module this cabinet is wired to (1..255, see README)
 //      relay   = number of the relay on that module that opens the lock (1..8)
@@ -35,12 +35,12 @@ struct Cabinet {
 
 const Cabinet Cabinets[] = {
   // board              module  relay  contact
-  { &ModbusWaveshare8,   2,      1,     1 },   // cabinet 1
-  { &ModbusWaveshare8,   2,      2,     2 },   // cabinet 2
-  { &ModbusWaveshare8,   2,      3,     3 },   // cabinet 3
-  { &ModbusWaveshare8,   1,      2,     1 },   // cabinet 4
-  { &ModbusWaveshare8,   1,      1,     2 },   // cabinet 5
-  { &ModbusWaveshare8,   2,      4,     4 },   // cabinet 6
+  { &ModbusWaveshare,   2,      1,     1 },   // cabinet 1
+  { &ModbusWaveshare,   2,      2,     2 },   // cabinet 2
+  { &ModbusWaveshare,   2,      3,     3 },   // cabinet 3
+  { &ModbusWaveshare,   1,      2,     1 },   // cabinet 4
+  { &ModbusWaveshare,   1,      1,     2 },   // cabinet 5
+  { &ModbusWaveshare,   2,      4,     4 },   // cabinet 6
 };
 #define Channel (sizeof(Cabinets) / sizeof(Cabinets[0]))
 

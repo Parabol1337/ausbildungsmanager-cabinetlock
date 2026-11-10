@@ -20,8 +20,8 @@ struct ModbusBoardType {
   bool inputsMsbFirst;          // false: input 1 is bit 0 of the answer, true: input 1 is bit 7
 };
 
-// Waveshare "Modbus RTU Relay" (8 relays, 8 optocoupler inputs): registers 0x0003, 0x0008, 0x000D, ..., steps of 0.1 s.
-const ModbusBoardType ModbusWaveshare8 = {"Waveshare Modbus RTU Relay", 3, 5, 100, false};
+// Waveshare "Modbus RTU Relay" (the 1, 2, 4 and 8 relay versions speak the same commands; relay numbers 1..8, inputs 1..8): registers 0x0003, 0x0008, 0x000D, ..., steps of 0.1 s.
+const ModbusBoardType ModbusWaveshare = {"Waveshare Modbus RTU Relay", 3, 5, 100, false};
 
 // How long a missing answer is waited for
 #ifndef Modbus_Reply_Timeout
